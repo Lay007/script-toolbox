@@ -1,19 +1,22 @@
 # setup-windows-git-basic.ps1
 
-PowerShell-скрипт для **установки Git for Windows** и **базовой настройки Git** для указанного пользователя Windows.
+PowerShell-скрипт для **установки Git for Windows** и **базовой настройки Git + SSH** для указанного пользователя Windows.
 
-Скрипт рассчитан на запуск **на сервере Windows из-под администратора**.  
+Скрипт рассчитан на запуск **на сервере Windows из-под администратора**.
 Он:
 
 - устанавливает Git через `winget` или локальный инсталлятор;
 - настраивает Git для выбранного пользователя через отдельный `.gitconfig`;
 - принимает **SSH private key как параметр**;
-- кладёт ключ в `%USERPROFILE%\.ssh\id_ed25519`;
+- копирует закрытый ключ в `%USERPROFILE%\.ssh\id_ed25519`;
 - при возможности автоматически создаёт публичный ключ `id_ed25519.pub`;
-- ограничивает ACL для `.ssh`, ключей, `known_hosts` и `.gitconfig`;
-- задаёт базовые параметры Git.
+- создаёт или обновляет `%USERPROFILE%\.ssh\config`;
+- при запуске **спрашивает имя Git-сервера**, если параметр `-GitServerHost` не передан;
+- создаёт отдельный `Host`-блок для нужного Git-сервера;
+- удаляет из пользовательского `.gitconfig` старый `core.sshCommand`, чтобы Git использовал обычный OpenSSH-конфиг пользователя;
+- ограничивает ACL для `.ssh`, ключей, `config`, `known_hosts` и `.gitconfig`.
 
-## Что настраивается
+## Что именно настраивается
 
 По умолчанию скрипт выставляет:
 
@@ -25,8 +28,19 @@ PowerShell-скрипт для **установки Git for Windows** и **ба�
 - `push.default=simple`
 - `rebase.autoStash=true`
 - `core.autocrlf=false` — по умолчанию
-- `core.sshCommand=ssh -i "<path-to-key>" -o IdentitiesOnly=yes`
 - `credential.helper=manager-core` — если не отключено параметром
+
+В `%USERPROFILE%\.ssh\config` создаётся managed-блок вида:
+
+```sshconfig
+Host github.com
+    HostName github.com
+    User git
+    Port 22
+    IdentityFile ~/.ssh/id_ed25519
+    IdentitiesOnly yes
+    PreferredAuthentications publickey
+```
 
 ## Обязательные параметры
 
@@ -41,6 +55,12 @@ PowerShell-скрипт для **установки Git for Windows** и **ба�
 
 - `-SshPublicKeyPath`
 - `-SshPublicKey`
+- `-GitServerHost`
+  - если не передать, скрипт спросит его интерактивно
+- `-GitServerSshUser` (по умолчанию `git`)
+- `-GitHostAlias`
+  - если не передать, будет равен `GitServerHost`
+- `-GitServerPort` (по умолчанию `22`)
 - `-InstallMode auto|winget|local|skip`
 - `-LocalInstallerPath`
 - `-GitPackageId` (по умолчанию `Git.Git`)
@@ -49,10 +69,12 @@ PowerShell-скрипт для **установки Git for Windows** и **ба�
 - `-AutoCrlf false|true|input` (по умолчанию `false`)
 - `-EnableCredentialManager`
 - `-InstallGitLfs`
+- `-Force`
+  - разрешает перезаписать уже существующие `id_ed25519` / `id_ed25519.pub`, если их содержимое отличается
 
 ## Примеры запуска
 
-### 1. Установка Git через winget и настройка по private key файлу
+### 1. Обычный запуск с интерактивным вводом имени Git-сервера
 
 ```powershell
 Set-ExecutionPolicy Bypass -Scope Process -Force
@@ -64,7 +86,14 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
   -InstallMode auto
 ```
 
-### 2. То же, но с явной передачей public key
+Скрипт сам спросит, например:
+
+```text
+Enter Git server hostname (for example: gitlab.example.com): github.com
+Enter Git SSH username [git]:
+```
+
+### 2. С явной передачей Git-сервера
 
 ```powershell
 .\setup-windows-git-basic.ps1 `
@@ -72,11 +101,38 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
   -GitUserName "Alexander" `
   -GitUserEmail "alex@example.com" `
   -SshPrivateKeyPath C:\user-git\id_ed25519 `
-  -SshPublicKeyPath C:\user-git\id_ed25519.pub `
+  -GitServerHost github.com `
+  -GitServerSshUser git `
   -InstallMode auto
 ```
 
-### 3. Передача private key строкой
+### 3. Если нужен отдельный alias в SSH config
+
+```powershell
+.\setup-windows-git-basic.ps1 `
+  -Username user-git `
+  -GitUserName "Alexander" `
+  -GitUserEmail "alex@example.com" `
+  -SshPrivateKeyPath C:\user-git\id_ed25519 `
+  -GitServerHost github.com `
+  -GitHostAlias my-git
+```
+
+Тогда в `.ssh\config` получится блок:
+
+```sshconfig
+Host my-git github.com
+    HostName github.com
+    User git
+    Port 22
+    IdentityFile ~/.ssh/id_ed25519
+    IdentitiesOnly yes
+    PreferredAuthentications publickey
+```
+
+И можно использовать URL с alias, если захочется.
+
+### 4. Передача private key строкой
 
 ```powershell
 $priv = Get-Content C:\user-git\id_ed25519 -Raw
@@ -87,7 +143,7 @@ $priv = Get-Content C:\user-git\id_ed25519 -Raw
   -SshPrivateKey $priv
 ```
 
-### 4. Установка из локального инсталлятора Git for Windows
+### 5. Принудительная перезапись ключей
 
 ```powershell
 .\setup-windows-git-basic.ps1 `
@@ -95,15 +151,35 @@ $priv = Get-Content C:\user-git\id_ed25519 -Raw
   -GitUserName "Alexander" `
   -GitUserEmail "alex@example.com" `
   -SshPrivateKeyPath C:\user-git\id_ed25519 `
-  -InstallMode local `
-  -LocalInstallerPath C:\Install\Git-64-bit.exe
+  -Force
 ```
 
-## Что важно знать
+## Что проверить после запуска
 
-### 1. Скрипт ожидает существующего пользователя Windows
+```powershell
+git --version
+git config --file "C:\Users\user-git\.gitconfig" --list
+type C:\Users\user-git\.ssh\config
+type C:\Users\user-git\.ssh\id_ed25519.pub
+```
 
-Скрипт не создаёт пользователя. Пользователь должен уже существовать.  
+Проверка SSH:
+
+```powershell
+ssh -F "C:\Users\user-git\.ssh\config" -T github.com
+```
+
+или, если использован alias:
+
+```powershell
+ssh -F "C:\Users\user-git\.ssh\config" -T my-git
+```
+
+## Важные замечания
+
+### 1. Скрипт не создаёт пользователя Windows
+
+Пользователь Windows должен уже существовать.
 Лучше, если он хотя бы один раз входил в систему, чтобы профиль уже был создан.
 
 ### 2. Ключ — это именно private key
@@ -116,23 +192,21 @@ $priv = Get-Content C:\user-git\id_ed25519 -Raw
 
 ### 4. known_hosts не заполняется автоматически
 
-Скрипт создаёт пустой `known_hosts`, но не добавляет отпечатки удалённых Git-серверов.  
+Скрипт создаёт пустой `known_hosts`, но не добавляет отпечатки удалённых Git-серверов.
 Первое подключение по SSH может спросить подтверждение host key.
 
-## Что проверить после запуска
+### 5. Managed-блок в `.ssh\config`
 
-```powershell
-git --version
-git config --file "C:\Users\user-git\.gitconfig" --list
-type C:\Users\user-git\.ssh\id_ed25519.pub
+Скрипт не затирает весь пользовательский `config`.
+Он создаёт или обновляет только свой помеченный блок:
+
+```text
+# BEGIN managed by setup-windows-git-basic.ps1 : <alias>
+...
+# END managed by setup-windows-git-basic.ps1 : <alias>
 ```
 
-Проверка SSH:
-
-```powershell
-ssh -T git@github.com
-ssh -T git@gitlab.com
-```
+Это удобно, если у пользователя уже есть другие SSH-хосты.
 
 ## Где лежат результаты
 
@@ -141,19 +215,13 @@ ssh -T git@gitlab.com
 - Git: `C:\Program Files\Git\`
 - Git config пользователя: `C:\Users\<Username>\.gitconfig`
 - SSH-ключи: `C:\Users\<Username>\.ssh\`
+- SSH config: `C:\Users\<Username>\.ssh\config`
 
 ## Типовой сценарий использования
 
-1. Создать или подготовить пользователя Windows.
+1. Подготовить пользователя Windows.
 2. Запустить этот скрипт от администратора.
-3. Добавить публичный ключ на GitHub / GitLab / другой Git-сервер.
-4. Проверить `ssh -T`.
-5. Использовать Git из VS Code Remote SSH.
-
-## Замечание
-
-Если на сервере `winget` работает нестабильно, используйте режим:
-
-```powershell
--InstallMode local -LocalInstallerPath C:\Path\To\Git-Installer.exe
-```
+3. Передать имя Git-сервера при запуске.
+4. Добавить публичный ключ на GitLab / GitHub / другой Git-сервер.
+5. Проверить `ssh -T`.
+6. Использовать Git из VS Code Remote SSH.

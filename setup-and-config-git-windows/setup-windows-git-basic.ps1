@@ -27,6 +27,19 @@ param(
     [string]$SshPublicKey,
 
     [Parameter(Mandatory = $false)]
+    [string]$GitServerHost,
+
+    [Parameter(Mandatory = $false)]
+    [string]$GitServerSshUser = 'git',
+
+    [Parameter(Mandatory = $false)]
+    [string]$GitHostAlias,
+
+    [Parameter(Mandatory = $false)]
+    [ValidateRange(1, 65535)]
+    [int]$GitServerPort = 22,
+
+    [Parameter(Mandatory = $false)]
     [ValidateSet('auto', 'winget', 'local', 'skip')]
     [string]$InstallMode = 'auto',
 
@@ -182,11 +195,7 @@ function Set-RestrictedAcl {
         $acl.AddAccessRule($rule) | Out-Null
     }
 
-    if ($IsDirectory) {
-        Set-Acl -Path $Path -AclObject $acl
-    } else {
-        Set-Acl -Path $Path -AclObject $acl
-    }
+    Set-Acl -Path $Path -AclObject $acl
 }
 
 function Resolve-GitExe {
@@ -240,7 +249,7 @@ function Install-GitIfNeeded {
     if ($Mode -in @('auto', 'winget')) {
         $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
         if ($winget) {
-            Write-Info "Installing Git with winget package '$PackageId'..."
+            Write-Info "Installing Git via winget..."
             $args = @(
                 'install',
                 '--id', $PackageId,
@@ -250,50 +259,50 @@ function Install-GitIfNeeded {
                 '--accept-source-agreements',
                 '--disable-interactivity'
             )
+
             $process = Start-Process -FilePath $winget.Source -ArgumentList $args -Wait -PassThru -WindowStyle Hidden
             if ($process.ExitCode -eq 0) {
                 $installed = $true
-                Write-Ok "Git installation via winget completed."
-            } elseif ($Mode -eq 'winget') {
-                throw "winget installation failed with exit code $($process.ExitCode)."
+                Write-Ok 'Git installation via winget completed.'
             } else {
-                Write-WarnMsg "winget installation failed with exit code $($process.ExitCode). Will try fallback if available."
+                Write-WarnMsg "winget installation failed with exit code $($process.ExitCode)."
+                if ($Mode -eq 'winget') {
+                    throw "winget installation failed with exit code $($process.ExitCode)."
+                }
             }
         } elseif ($Mode -eq 'winget') {
-            throw "winget.exe not found, but InstallMode=winget was specified."
-        } else {
-            Write-WarnMsg "winget.exe not found. Will try fallback if available."
+            throw 'winget.exe not found.'
         }
     }
 
-    if (-not $installed -and $Mode -in @('auto', 'local')) {
+    if ((-not $installed) -and ($Mode -in @('auto', 'local'))) {
         if (-not $InstallerPath) {
             if ($Mode -eq 'local') {
-                throw "LocalInstallerPath is required when InstallMode=local."
+                throw 'InstallMode=local requires -LocalInstallerPath.'
             }
         } else {
             if (-not (Test-Path $InstallerPath -PathType Leaf)) {
                 throw "Local installer not found: $InstallerPath"
             }
 
-            Write-Info "Installing Git from local installer..."
-            $installerArgs = @('/VERYSILENT', '/NORESTART', '/NOCANCEL', '/SP-', '/CLOSEAPPLICATIONS', '/RESTARTAPPLICATIONS')
-            $process = Start-Process -FilePath $InstallerPath -ArgumentList $installerArgs -Wait -PassThru
+            Write-Info "Installing Git via local installer..."
+            $installerArgs = @('/VERYSILENT', '/NORESTART', '/NOCANCEL', '/SP-', '/SUPPRESSMSGBOXES', '/CLOSEAPPLICATIONS', '/RESTARTAPPLICATIONS')
+            $process = Start-Process -FilePath $InstallerPath -ArgumentList $installerArgs -Wait -PassThru -WindowStyle Hidden
             if ($process.ExitCode -eq 0) {
                 $installed = $true
-                Write-Ok "Git installation from local installer completed."
+                Write-Ok 'Git installation via local installer completed.'
             } else {
-                throw "Local installer failed with exit code $($process.ExitCode)."
+                throw "Local Git installer failed with exit code $($process.ExitCode)."
             }
         }
     }
 
+    Add-GitToCurrentPath
     $gitExe = Resolve-GitExe
     if (-not $gitExe) {
-        throw "Git installation finished, but git.exe was not found."
+        throw 'Git installation appears to have completed, but git.exe was not found.'
     }
 
-    Add-GitToCurrentPath
     return $gitExe
 }
 
@@ -304,12 +313,8 @@ function Get-KeyText {
         [string]$Description
     )
 
-    if ($PathValue -and $RawValue) {
-        throw "Specify either ${Description}Path or ${Description}, not both."
-    }
-
     if ($PathValue) {
-        return Get-Content -Path $PathValue -Raw -Encoding UTF8
+        return [System.IO.File]::ReadAllText((Resolve-Path $PathValue), [System.Text.Encoding]::UTF8)
     }
 
     if ($RawValue) {
@@ -333,6 +338,51 @@ function Write-TextFileNormalized {
     [System.IO.File]::WriteAllText($Path, $normalized, $utf8NoBom)
 }
 
+function Normalize-TextContent {
+    param([string]$Content)
+
+    if ($null -eq $Content) {
+        return $null
+    }
+
+    $normalized = ($Content -replace "`r`n", "`n").Trim()
+    if (-not $normalized.EndsWith("`n")) {
+        $normalized += "`n"
+    }
+    return $normalized
+}
+
+function Write-ManagedTextFile {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Content,
+        [Parameter(Mandatory = $true)][System.Security.Principal.NTAccount]$UserAccount,
+        [Parameter(Mandatory = $false)][switch]$AllowOverwrite
+    )
+
+    $newContent = Normalize-TextContent -Content $Content
+    if (Test-Path $Path) {
+        $existingContent = Normalize-TextContent -Content ([System.IO.File]::ReadAllText($Path))
+        if ($existingContent -eq $newContent) {
+            Set-RestrictedAcl -Path $Path -UserAccount $UserAccount -IsDirectory $false
+            Write-Ok "File already up to date: $Path"
+            return
+        }
+
+        if (-not $AllowOverwrite) {
+            throw "File already exists and differs: $Path. Re-run with -Force to overwrite."
+        }
+
+        $backupPath = "$Path.bak"
+        Copy-Item -Path $Path -Destination $backupPath -Force
+        Write-WarnMsg "Existing file was backed up: $backupPath"
+    }
+
+    Write-TextFileNormalized -Path $Path -Content $newContent
+    Set-RestrictedAcl -Path $Path -UserAccount $UserAccount -IsDirectory $false
+    Write-Ok "Wrote file: $Path"
+}
+
 function Invoke-GitConfigSet {
     param(
         [string]$GitExe,
@@ -347,6 +397,80 @@ function Invoke-GitConfigSet {
     }
 }
 
+function Invoke-GitConfigUnsetAllIfExists {
+    param(
+        [string]$GitExe,
+        [string]$ConfigFile,
+        [string]$Key
+    )
+
+    & $GitExe config --file $ConfigFile --unset-all $Key 2>$null
+    $global:LASTEXITCODE = 0
+}
+
+function Get-InteractiveValue {
+    param(
+        [Parameter(Mandatory = $true)][string]$Prompt,
+        [string]$DefaultValue
+    )
+
+    if ($DefaultValue) {
+        $value = Read-Host "$Prompt [$DefaultValue]"
+        if ([string]::IsNullOrWhiteSpace($value)) {
+            return $DefaultValue
+        }
+        return $value.Trim()
+    }
+
+    while ($true) {
+        $value = Read-Host $Prompt
+        if (-not [string]::IsNullOrWhiteSpace($value)) {
+            return $value.Trim()
+        }
+        Write-WarnMsg 'Value cannot be empty.'
+    }
+}
+
+function Update-ManagedSshConfigBlock {
+    param(
+        [Parameter(Mandatory = $true)][string]$ConfigPath,
+        [Parameter(Mandatory = $true)][System.Security.Principal.NTAccount]$UserAccount,
+        [Parameter(Mandatory = $true)][string]$ManagedId,
+        [Parameter(Mandatory = $true)][string]$BlockContent
+    )
+
+    $beginMarker = "# BEGIN managed by setup-windows-git-basic.ps1 : $ManagedId"
+    $endMarker = "# END managed by setup-windows-git-basic.ps1 : $ManagedId"
+    $managedBlock = @(
+        $beginMarker,
+        $BlockContent.TrimEnd(),
+        $endMarker,
+        ''
+    ) -join "`n"
+
+    $existing = ''
+    if (Test-Path $ConfigPath) {
+        $existing = [System.IO.File]::ReadAllText($ConfigPath)
+    }
+
+    $pattern = [regex]::Escape($beginMarker) + '.*?' + [regex]::Escape($endMarker) + '(\r?\n)?'
+    if ([regex]::IsMatch($existing, $pattern, [System.Text.RegularExpressions.RegexOptions]::Singleline)) {
+        $updated = [regex]::Replace($existing, $pattern, $managedBlock, [System.Text.RegularExpressions.RegexOptions]::Singleline)
+    } else {
+        if ($existing -and -not $existing.EndsWith("`n")) {
+            $existing += "`n"
+        }
+        if ($existing -and -not $existing.EndsWith("`n`n")) {
+            $existing += "`n"
+        }
+        $updated = $existing + $managedBlock
+    }
+
+    Write-TextFileNormalized -Path $ConfigPath -Content $updated
+    Set-RestrictedAcl -Path $ConfigPath -UserAccount $UserAccount -IsDirectory $false
+    Write-Ok "Updated SSH config: $ConfigPath"
+}
+
 Require-Administrator
 
 if (-not $PSBoundParameters.ContainsKey('SshPrivateKeyPath') -and -not $PSBoundParameters.ContainsKey('SshPrivateKey')) {
@@ -355,6 +479,11 @@ if (-not $PSBoundParameters.ContainsKey('SshPrivateKeyPath') -and -not $PSBoundP
 
 if ($PSBoundParameters.ContainsKey('SshPublicKeyPath') -and $PSBoundParameters.ContainsKey('SshPublicKey')) {
     throw "Specify either -SshPublicKeyPath or -SshPublicKey, not both."
+}
+
+$GitServerHost = Get-InteractiveValue -Prompt 'Enter Git server hostname (for example: gitlab.example.com)' -DefaultValue $GitServerHost
+if (-not $GitHostAlias) {
+    $GitHostAlias = $GitServerHost
 }
 
 Write-Info "Resolving user '$Username'..."
@@ -373,17 +502,15 @@ Set-RestrictedAcl -Path $sshDir -UserAccount $userObject.Account -IsDirectory $t
 
 $privateKeyFile = Join-Path $sshDir 'id_ed25519'
 $privateKeyText = Get-KeyText -PathValue $SshPrivateKeyPath -RawValue $SshPrivateKey -Description 'SshPrivateKey'
-Write-Info "Writing SSH private key..."
-Write-TextFileNormalized -Path $privateKeyFile -Content $privateKeyText
-Set-RestrictedAcl -Path $privateKeyFile -UserAccount $userObject.Account -IsDirectory $false
+Write-Info "Writing SSH private key to $privateKeyFile ..."
+Write-ManagedTextFile -Path $privateKeyFile -Content $privateKeyText -UserAccount $userObject.Account -AllowOverwrite:$Force
 
 $publicKeyFile = Join-Path $sshDir 'id_ed25519.pub'
 $publicKeyText = Get-KeyText -PathValue $SshPublicKeyPath -RawValue $SshPublicKey -Description 'SshPublicKey'
 
 if ($publicKeyText) {
-    Write-Info "Writing SSH public key..."
-    Write-TextFileNormalized -Path $publicKeyFile -Content $publicKeyText
-    Set-RestrictedAcl -Path $publicKeyFile -UserAccount $userObject.Account -IsDirectory $false
+    Write-Info "Writing SSH public key to $publicKeyFile ..."
+    Write-ManagedTextFile -Path $publicKeyFile -Content $publicKeyText -UserAccount $userObject.Account -AllowOverwrite:$Force
 } else {
     $sshKeygen = Get-Command ssh-keygen.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue
     if (-not $sshKeygen) {
@@ -395,20 +522,19 @@ if ($publicKeyText) {
 
     if (Test-Path $sshKeygen) {
         try {
-            Write-Info "Generating public key from private key..."
+            Write-Info 'Generating public key from private key...'
             $generatedPublic = & $sshKeygen -y -f $privateKeyFile 2>$null
             if ($LASTEXITCODE -eq 0 -and $generatedPublic) {
-                Write-TextFileNormalized -Path $publicKeyFile -Content $generatedPublic
-                Set-RestrictedAcl -Path $publicKeyFile -UserAccount $userObject.Account -IsDirectory $false
+                Write-ManagedTextFile -Path $publicKeyFile -Content $generatedPublic -UserAccount $userObject.Account -AllowOverwrite:$Force
                 Write-Ok "Public key generated: $publicKeyFile"
             } else {
-                Write-WarnMsg "Could not generate public key automatically. This can happen with passphrase-protected keys."
+                Write-WarnMsg 'Could not generate public key automatically. This can happen with passphrase-protected keys.'
             }
         } catch {
             Write-WarnMsg "Could not generate public key automatically: $($_.Exception.Message)"
         }
     } else {
-        Write-WarnMsg "ssh-keygen.exe not found, skipping automatic public key generation."
+        Write-WarnMsg 'ssh-keygen.exe not found, skipping automatic public key generation.'
     }
 }
 
@@ -418,21 +544,39 @@ if (-not (Test-Path $knownHostsFile)) {
 }
 Set-RestrictedAcl -Path $knownHostsFile -UserAccount $userObject.Account -IsDirectory $false
 
+$sshConfigFile = Join-Path $sshDir 'config'
+if (-not (Test-Path $sshConfigFile)) {
+    New-Item -ItemType File -Path $sshConfigFile -Force | Out-Null
+}
+Set-RestrictedAcl -Path $sshConfigFile -UserAccount $userObject.Account -IsDirectory $false
+
+$hostPatterns = if ($GitHostAlias -and ($GitHostAlias -ne $GitServerHost)) { "$GitHostAlias $GitServerHost" } else { $GitServerHost }
+$sshBlock = @"
+Host $hostPatterns
+    HostName $GitServerHost
+    User $GitServerSshUser
+    Port $GitServerPort
+    IdentityFile ~/.ssh/id_ed25519
+    IdentitiesOnly yes
+    PreferredAuthentications publickey
+"@
+Update-ManagedSshConfigBlock -ConfigPath $sshConfigFile -UserAccount $userObject.Account -ManagedId $GitHostAlias -BlockContent $sshBlock
+
 $gitConfigFile = Join-Path $profilePath '.gitconfig'
 if (-not (Test-Path $gitConfigFile)) {
     New-Item -ItemType File -Path $gitConfigFile -Force | Out-Null
 }
 Set-RestrictedAcl -Path $gitConfigFile -UserAccount $userObject.Account -IsDirectory $false
 
-Write-Info "Configuring Git settings..."
+Write-Info 'Configuring Git settings...'
 Invoke-GitConfigSet -GitExe $gitExe -ConfigFile $gitConfigFile -Key 'user.name' -Value $GitUserName
 Invoke-GitConfigSet -GitExe $gitExe -ConfigFile $gitConfigFile -Key 'user.email' -Value $GitUserEmail
 Invoke-GitConfigSet -GitExe $gitExe -ConfigFile $gitConfigFile -Key 'init.defaultBranch' -Value $DefaultBranch
 Invoke-GitConfigSet -GitExe $gitExe -ConfigFile $gitConfigFile -Key 'fetch.prune' -Value 'true'
 Invoke-GitConfigSet -GitExe $gitExe -ConfigFile $gitConfigFile -Key 'core.autocrlf' -Value $AutoCrlf
-Invoke-GitConfigSet -GitExe $gitExe -ConfigFile $gitConfigFile -Key 'core.sshCommand' -Value ("ssh -i `"$privateKeyFile`" -o IdentitiesOnly=yes")
 Invoke-GitConfigSet -GitExe $gitExe -ConfigFile $gitConfigFile -Key 'push.default' -Value 'simple'
 Invoke-GitConfigSet -GitExe $gitExe -ConfigFile $gitConfigFile -Key 'rebase.autoStash' -Value 'true'
+Invoke-GitConfigUnsetAllIfExists -GitExe $gitExe -ConfigFile $gitConfigFile -Key 'core.sshCommand'
 
 if ($PullMode -eq 'rebase') {
     Invoke-GitConfigSet -GitExe $gitExe -ConfigFile $gitConfigFile -Key 'pull.rebase' -Value 'true'
@@ -449,7 +593,7 @@ if ($InstallGitLfs) {
     if (-not $gitLfsCmd) {
         $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
         if ($winget) {
-            Write-Info "Installing Git LFS..."
+            Write-Info 'Installing Git LFS...'
             $args = @(
                 'install',
                 '--id', 'GitHub.GitLFS',
@@ -464,7 +608,7 @@ if ($InstallGitLfs) {
                 Write-WarnMsg "Git LFS installation failed with exit code $($process.ExitCode)."
             }
         } else {
-            Write-WarnMsg "winget.exe not found. Skipping Git LFS installation."
+            Write-WarnMsg 'winget.exe not found. Skipping Git LFS installation.'
         }
     }
 
@@ -472,26 +616,27 @@ if ($InstallGitLfs) {
     if ($gitLfsCmd) {
         & $gitExe lfs install
         if ($LASTEXITCODE -eq 0) {
-            Write-Ok "Git LFS initialized."
+            Write-Ok 'Git LFS initialized.'
         } else {
-            Write-WarnMsg "git lfs install returned exit code $LASTEXITCODE."
+            Write-WarnMsg 'Git LFS was installed, but initialization returned a non-zero exit code.'
         }
-    } else {
-        Write-WarnMsg "git-lfs.exe not found after installation attempt."
     }
 }
 
-Write-Host ""
-Write-Ok "Done."
-Write-Host "Git config file : $gitConfigFile"
-Write-Host "SSH directory   : $sshDir"
-Write-Host "Private key     : $privateKeyFile"
-if (Test-Path $publicKeyFile) {
-    Write-Host "Public key      : $publicKeyFile"
-}
-Write-Host ""
-Write-Host "Next checks:"
-Write-Host "  git --version"
+Write-Ok 'Git basic setup completed.'
+Write-Host ''
+Write-Host 'Summary:' -ForegroundColor White
+Write-Host "  Windows user     : $Username"
+Write-Host "  Git user.name    : $GitUserName"
+Write-Host "  Git user.email   : $GitUserEmail"
+Write-Host "  Git server host  : $GitServerHost"
+Write-Host "  Git SSH user     : $GitServerSshUser"
+Write-Host "  SSH host alias   : $GitHostAlias"
+Write-Host "  SSH config file  : $sshConfigFile"
+Write-Host "  Private key file : $privateKeyFile"
+Write-Host "  Public key file  : $publicKeyFile"
+Write-Host "  Git config file  : $gitConfigFile"
+Write-Host ''
+Write-Host 'Recommended checks:' -ForegroundColor White
+Write-Host "  ssh -F `"$sshConfigFile`" -T $GitHostAlias"
 Write-Host "  git config --file `"$gitConfigFile`" --list"
-Write-Host "  ssh -T git@github.com"
-Write-Host "  ssh -T git@gitlab.com"
