@@ -10,6 +10,21 @@ This repository is intended for developers, administrators, and power users who 
 
 ---
 
+## Engineering value
+
+`script-toolbox` turns repeated Windows workstation and remote-access setup into documented, inspectable and repeatable engineering procedures.
+
+| Scenario | Toolkit | Result |
+|---|---|---|
+| Prepare a Windows host for SSH administration | [`config-ssh-client-windows`](./config-ssh-client-windows) | key-based OpenSSH access with validation and safer permissions |
+| Create a clean Git + SSH workflow for a dedicated user | [`setup-and-config-git-windows`](./setup-and-config-git-windows) | reproducible Git identity, SSH key placement and managed SSH config |
+| Install CMake on a Windows build machine | [`setup-cmake-windows`](./setup-cmake-windows) | verified CMake installation and current-session PATH recovery |
+| Install native C++ build tools | [`setup-vs2026-buildtools-windows`](./setup-vs2026-buildtools-windows) | Visual Studio Build Tools bootstrap with installer validation |
+
+Safety and review rules are documented in [Engineering Safety Model](./docs/engineering-safety-model.md).
+
+---
+
 ## What this repository is for
 
 `script-toolbox` is a curated set of focused setup kits that help you:
@@ -123,6 +138,8 @@ script-toolbox/
 │  ├─ README-setup-windows-openssh-keyonly.md
 │  ├─ README-setup-windows-openssh-keyonly-ru.md
 │  └─ setup-windows-openssh-keyonly.ps1
+├─ docs/
+│  └─ engineering-safety-model.md
 ├─ setup-and-config-git-windows/
 │  ├─ README-setup-windows-git-basic.md
 │  ├─ README-setup-windows-git-basic-ru.md
