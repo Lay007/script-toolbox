@@ -1,0 +1,33 @@
+name: Toolkit improvement
+description: Propose an improvement for an existing script toolkit
+title: "Improve: "
+labels: [enhancement]
+body:
+  - type: input
+    id: toolkit
+    attributes:
+      label: Toolkit
+      description: Which directory or script is affected?
+      placeholder: setup-cmake-windows
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is missing, unsafe, unclear, or hard to use?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed improvement
+      description: Describe the concrete change you want.
+    validations:
+      required: true
+  - type: textarea
+    id: checks
+    attributes:
+      label: Validation
+      description: How should the change be tested or reviewed?
+      placeholder: PSScriptAnalyzer, dry run, elevated Windows test VM, README example
