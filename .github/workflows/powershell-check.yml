@@ -1,0 +1,51 @@
+name: PowerShell Check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  syntax:
+    name: PowerShell syntax check
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check PowerShell script syntax
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $scripts = Get-ChildItem -Path . -Recurse -Filter *.ps1
+          if (-not $scripts) {
+            Write-Host 'No PowerShell scripts found.'
+            exit 0
+          }
+
+          foreach ($script in $scripts) {
+            Write-Host "Checking $($script.FullName)"
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($script.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error "$($script.FullName): $($_.Message)" }
+              exit 1
+            }
+          }
+
+      - name: Check toolkit documentation pairs
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $toolDirs = Get-ChildItem -Path . -Directory | Where-Object {
+            Test-Path (Join-Path $_.FullName '*.ps1')
+          }
+
+          foreach ($dir in $toolDirs) {
+            $english = Get-ChildItem -Path $dir.FullName -Filter 'README-*.md' | Where-Object { $_.Name -notmatch '-ru\.md$' }
+            $russian = Get-ChildItem -Path $dir.FullName -Filter 'README-*-ru.md'
+            if (-not $english -or -not $russian) {
+              Write-Error "Toolkit '$($dir.Name)' should have both English and Russian README files."
+            }
+          }
