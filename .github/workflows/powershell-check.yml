@@ -6,7 +6,7 @@ on:
 
 jobs:
   syntax:
-    name: PowerShell syntax check
+    name: PowerShell syntax and quality check
     runs-on: windows-latest
 
     steps:
@@ -32,6 +32,21 @@ jobs:
               $errors | ForEach-Object { Write-Error "$($script.FullName): $($_.Message)" }
               exit 1
             }
+          }
+
+      - name: Run PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Severity Error,Warning
+          if ($results) {
+            $results | Format-Table -AutoSize
+          }
+          $errors = @($results | Where-Object { $_.Severity -eq 'Error' })
+          if ($errors.Count -gt 0) {
+            Write-Error "PSScriptAnalyzer found $($errors.Count) error(s)."
+            exit 1
           }
 
       - name: Check toolkit documentation pairs
