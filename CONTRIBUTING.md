@@ -2,13 +2,78 @@
 
 Thank you for improving `script-toolbox`.
 
+This repository contains scripts that may change Windows system configuration, SSH settings, user accounts, PATH variables and developer tools. Contributions should therefore prioritize safety, clarity and repeatability.
+
+## Contribution principles
+
+- Keep scripts small and focused.
+- Prefer explicit parameters over hidden assumptions.
+- Validate inputs before changing system state.
+- Make scripts idempotent where practical.
+- Print what is being changed and where.
+- Document verification and rollback steps.
+- Update English and Russian documentation together when behavior changes.
+
+## Script checklist
+
+Before opening a pull request, check that the script answers these questions:
+
+- Does it require elevated PowerShell?
+- What files, users, services or PATH entries does it modify?
+- Can it be run twice without duplicating configuration?
+- Does it fail early on invalid input?
+- Does it avoid hard-coded user-specific paths?
+- Does it preserve enough information for manual recovery?
+- Does it include post-run verification commands?
+
+## Documentation checklist
+
+Every toolkit should ideally include:
+
+```text
+<toolkit>/
+  setup-*.ps1
+  README-*.md
+  README-*-ru.md
+```
+
+Documentation should include:
+
+- purpose and scope;
+- prerequisites;
+- example command;
+- parameter table;
+- post-run verification;
+- troubleshooting notes;
+- rollback or manual recovery notes.
+
+## PowerShell style
+
+- Use named parameters for important behavior.
+- Use `$ErrorActionPreference = 'Stop'` for setup scripts.
+- Prefer `Join-Path` over manual path concatenation.
+- Prefer clear errors over silent fallback behavior.
+- Avoid downloading and executing remote code without validation.
+- Keep comments focused on why, not on obvious syntax.
+
 ## Local checks
 
 Before opening a pull request, run the same basic checks used by CI:
 
 ```powershell
+Get-ChildItem -Recurse -Filter *.ps1 | ForEach-Object {
+  $tokens = $null
+  $errors = $null
+  [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+  if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
+}
+```
+
+For deeper analysis, run PSScriptAnalyzer if available:
+
+```powershell
 Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
-Invoke-ScriptAnalyzer -Path . -Recurse -Severity Error
+Invoke-ScriptAnalyzer -Path . -Recurse
 ```
 
 If a `tests` directory exists for a toolkit, run its Pester tests as well:
@@ -17,21 +82,16 @@ If a `tests` directory exists for a toolkit, run its Pester tests as well:
 Invoke-Pester -Path tests -Output Detailed
 ```
 
-## Script quality rules
+## Commit style
 
-- Keep scripts focused on one setup task.
-- Prefer explicit parameters over hidden assumptions.
-- Validate prerequisites before changing the system.
-- Print clear status messages and actionable errors.
-- Update the toolkit README when behavior changes.
-- Avoid embedding secrets, private paths, or machine-specific values.
+Prefer small commits with clear intent:
 
-## Documentation rules
+```text
+Add CMake installer validation
+Document SSH key permission recovery
+Fix Git setup idempotence
+```
 
-Each substantial toolkit should include:
+## Security-sensitive changes
 
-- purpose and supported platform;
-- prerequisites;
-- example command lines;
-- what the script changes;
-- rollback or safety notes where relevant.
+Changes touching SSH configuration, user creation, credentials, installation URLs or file permissions should be reviewed carefully and documented in `SECURITY.md` when relevant.
