@@ -25,6 +25,17 @@ Safety and review rules are documented in [Engineering Safety Model](./docs/engi
 
 ---
 
+## CI and quality gates
+
+The repository uses a PowerShell lint workflow with two layers:
+
+1. `tools/test-powershell-syntax.ps1` parses all `.ps1` files through the PowerShell AST parser without executing target scripts.
+2. `PSScriptAnalyzer` runs with repository settings from `PSScriptAnalyzerSettings.psd1`.
+
+The analyzer is configured to fail the workflow on error-level findings while keeping warning-level findings visible in the job log.
+
+---
+
 ## What this repository is for
 
 `script-toolbox` is a curated set of focused setup kits that help you:
@@ -152,6 +163,9 @@ script-toolbox/
 │  ├─ README-setup-windows-vs2026-buildtools.md
 │  ├─ README-setup-windows-vs2026-buildtools-ru.md
 │  └─ setup-windows-vs2026-buildtools.ps1
+├─ tools/
+│  └─ test-powershell-syntax.ps1
+├─ PSScriptAnalyzerSettings.psd1
 └─ README.md
 ```
 
@@ -259,13 +273,4 @@ When contributing, prefer:
 
 ## License
 
-This project is licensed under the **MIT License**.
-See the [`LICENSE`](./LICENSE) file for details.
-
----
-
-## Author
-
-**Alexander / [Lay007](https://github.com/Lay007)**
-
-Practical scripts for real Windows setup, SSH workflow, and developer tooling.
+MIT
