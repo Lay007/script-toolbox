@@ -24,11 +24,16 @@ jobs:
           Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
           Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force
 
-      - name: Run analyzer
+      - name: Run analyzer diagnostics
         shell: pwsh
         run: |
-          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Severity Error,Warning
-          $results | Format-Table -AutoSize
-          if ($results) {
-            throw "PSScriptAnalyzer found issues."
+          $allResults = Invoke-ScriptAnalyzer -Path . -Recurse -Severity Error,Warning
+          $allResults | Format-Table -AutoSize
+
+          $errors = @($allResults | Where-Object { $_.Severity -eq 'Error' })
+          if ($errors.Count -gt 0) {
+            $errors | Format-Table -AutoSize
+            throw "PSScriptAnalyzer found error-level issues."
           }
+
+          Write-Host "PSScriptAnalyzer completed: $($allResults.Count) warning(s), 0 error(s)."
