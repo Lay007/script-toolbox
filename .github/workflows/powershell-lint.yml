@@ -32,7 +32,7 @@ jobs:
       - name: Run analyzer diagnostics
         shell: pwsh
         run: |
-          $allResults = Invoke-ScriptAnalyzer -Path . -Recurse -Severity Error,Warning
+          $allResults = Invoke-ScriptAnalyzer -Path . -Recurse -Settings PSScriptAnalyzerSettings.psd1
           $allResults | Format-Table -AutoSize
 
           $errors = @($allResults | Where-Object { $_.Severity -eq 'Error' })
