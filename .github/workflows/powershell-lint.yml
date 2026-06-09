@@ -19,6 +19,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Run PowerShell syntax check
+        shell: pwsh
+        run: pwsh -NoProfile -File tools/test-powershell-syntax.ps1
+
       - name: Install PSScriptAnalyzer
         shell: pwsh
         run: |
