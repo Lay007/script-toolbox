@@ -1,0 +1,28 @@
+# PowerShell and local execution artifacts
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# Local test outputs
+out/
+build/
+dist/
+coverage/
+
+# Editor and OS metadata
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Secrets and machine-specific configuration
+.env
+.env.*
+*.key
+*.pem
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
