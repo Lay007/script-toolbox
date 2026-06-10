@@ -143,6 +143,21 @@ What it does:
 - supports recommended components and extra workloads;
 - supports download-only mode.
 
+### 5. Repository quality tools
+
+Directory: [`tools`](./tools)
+
+Use these helper scripts to validate repository hygiene without executing setup scripts.
+
+Documentation:
+- [English guide](./tools/README-tools.md)
+- [Russian guide](./tools/README-tools-ru.md)
+
+What it does:
+- checks PowerShell syntax through the AST parser;
+- checks relative Markdown links;
+- supports safe local pre-commit review and GitHub Actions quality gates.
+
 ---
 
 ## Repository structure
@@ -169,6 +184,8 @@ script-toolbox/
 │  ├─ README-setup-windows-vs2026-buildtools-ru.md
 │  └─ setup-windows-vs2026-buildtools.ps1
 ├─ tools/
+│  ├─ README-tools.md
+│  ├─ README-tools-ru.md
 │  ├─ test-markdown-links.ps1
 │  └─ test-powershell-syntax.ps1
 ├─ CHANGELOG.md
