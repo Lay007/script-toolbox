@@ -23,6 +23,10 @@ jobs:
         shell: pwsh
         run: pwsh -NoProfile -File tools/test-powershell-syntax.ps1
 
+      - name: Check Markdown relative links
+        shell: pwsh
+        run: pwsh -NoProfile -File tools/test-markdown-links.ps1
+
       - name: Install PSScriptAnalyzer
         shell: pwsh
         run: |
