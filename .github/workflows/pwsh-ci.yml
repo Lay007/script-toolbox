@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   analyze:
@@ -14,16 +19,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Check PowerShell script syntax
+        shell: pwsh
+        run: pwsh -NoProfile -File tools/test-powershell-syntax.ps1
+
+      - name: Check Markdown relative links
+        shell: pwsh
+        run: pwsh -NoProfile -File tools/test-markdown-links.ps1
+
       - name: Install analyzer
         shell: pwsh
         run: |
-          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+          Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force
 
       - name: Run PSScriptAnalyzer
         shell: pwsh
         run: |
-          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Severity Error
+          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Settings PSScriptAnalyzerSettings.psd1
           $results | Format-Table -AutoSize
-          if ($results.Count -gt 0) {
-            exit 1
+
+          $errors = @($results | Where-Object { $_.Severity -eq 'Error' })
+          if ($errors.Count -gt 0) {
+            $errors | Format-Table -AutoSize
+            throw "PSScriptAnalyzer found error-level issues."
           }
+
+          Write-Host "PSScriptAnalyzer completed: $($results.Count) finding(s), $($errors.Count) error(s)."
