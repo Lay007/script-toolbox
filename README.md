@@ -1,5 +1,6 @@
 # script-toolbox
 
+[![PowerShell lint](https://github.com/Lay007/script-toolbox/actions/workflows/powershell-lint.yml/badge.svg)](https://github.com/Lay007/script-toolbox/actions/workflows/powershell-lint.yml)
 ![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B%20%7C%207%2B-5391FE?logo=powershell&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
@@ -32,6 +33,8 @@ The repository uses a PowerShell lint workflow with three layers:
 1. `tools/test-powershell-syntax.ps1` parses all `.ps1` files through the PowerShell AST parser without executing target scripts.
 2. `tools/test-markdown-links.ps1` checks relative Markdown links so README and docs stay synchronized with the repository layout.
 3. `PSScriptAnalyzer` runs with repository settings from `PSScriptAnalyzerSettings.psd1`.
+
+See [CI Quality Gates](./docs/ci-quality-gates.md) for local commands and policy details.
 
 The analyzer is configured to fail the workflow on error-level findings while keeping warning-level findings visible in the job log.
 
@@ -151,6 +154,7 @@ script-toolbox/
 │  ├─ README-setup-windows-openssh-keyonly-ru.md
 │  └─ setup-windows-openssh-keyonly.ps1
 ├─ docs/
+│  ├─ ci-quality-gates.md
 │  └─ engineering-safety-model.md
 ├─ setup-and-config-git-windows/
 │  ├─ README-setup-windows-git-basic.md
@@ -167,7 +171,10 @@ script-toolbox/
 ├─ tools/
 │  ├─ test-markdown-links.ps1
 │  └─ test-powershell-syntax.ps1
+├─ CHANGELOG.md
+├─ CONTRIBUTING.md
 ├─ PSScriptAnalyzerSettings.psd1
+├─ SECURITY.md
 └─ README.md
 ```
 
@@ -261,7 +268,7 @@ Planned or natural future additions may include:
 
 ## Contributing
 
-Issues and pull requests are welcome.
+Issues and pull requests are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md) and [CHANGELOG.md](./CHANGELOG.md) for repository workflow notes.
 
 When contributing, prefer:
 
