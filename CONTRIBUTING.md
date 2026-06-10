@@ -61,37 +61,17 @@ Documentation should include:
 Before opening a pull request, run the same basic checks used by CI:
 
 ```powershell
-Get-ChildItem -Recurse -Filter *.ps1 | ForEach-Object {
-  $tokens = $null
-  $errors = $null
-  [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors) | Out-Null
-  if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
-}
+pwsh -NoProfile -File tools/test-powershell-syntax.ps1
+pwsh -NoProfile -File tools/test-markdown-links.ps1
 ```
 
-For deeper analysis, run PSScriptAnalyzer if available:
+For deeper analysis, run PSScriptAnalyzer with the repository settings:
 
 ```powershell
-Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
-Invoke-ScriptAnalyzer -Path . -Recurse
+Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force
+Invoke-ScriptAnalyzer -Path . -Recurse -Settings PSScriptAnalyzerSettings.psd1
 ```
 
-If a `tests` directory exists for a toolkit, run its Pester tests as well:
+See [CI Quality Gates](./docs/ci-quality-gates.md) for the policy behind these checks.
 
-```powershell
-Invoke-Pester -Path tests -Output Detailed
-```
-
-## Commit style
-
-Prefer small commits with clear intent:
-
-```text
-Add CMake installer validation
-Document SSH key permission recovery
-Fix Git setup idempotence
-```
-
-## Security-sensitive changes
-
-Changes touching SSH configuration, user creation, credentials, installation URLs or file permissions should be reviewed carefully and documented in `SECURITY.md` when relevant.
+If a `tests` directory exists for a toolkit, run its Pester tests as well.
