@@ -27,10 +27,11 @@ Safety and review rules are documented in [Engineering Safety Model](./docs/engi
 
 ## CI and quality gates
 
-The repository uses a PowerShell lint workflow with two layers:
+The repository uses a PowerShell lint workflow with three layers:
 
 1. `tools/test-powershell-syntax.ps1` parses all `.ps1` files through the PowerShell AST parser without executing target scripts.
-2. `PSScriptAnalyzer` runs with repository settings from `PSScriptAnalyzerSettings.psd1`.
+2. `tools/test-markdown-links.ps1` checks relative Markdown links so README and docs stay synchronized with the repository layout.
+3. `PSScriptAnalyzer` runs with repository settings from `PSScriptAnalyzerSettings.psd1`.
 
 The analyzer is configured to fail the workflow on error-level findings while keeping warning-level findings visible in the job log.
 
@@ -164,6 +165,7 @@ script-toolbox/
 │  ├─ README-setup-windows-vs2026-buildtools-ru.md
 │  └─ setup-windows-vs2026-buildtools.ps1
 ├─ tools/
+│  ├─ test-markdown-links.ps1
 │  └─ test-powershell-syntax.ps1
 ├─ PSScriptAnalyzerSettings.psd1
 └─ README.md
