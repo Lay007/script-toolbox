@@ -22,7 +22,7 @@ This repository is intended for developers, administrators, and power users who 
 | Install CMake on a Windows build machine | [`setup-cmake-windows`](./setup-cmake-windows) | verified CMake installation and current-session PATH recovery |
 | Install native C++ build tools | [`setup-vs2026-buildtools-windows`](./setup-vs2026-buildtools-windows) | Visual Studio Build Tools bootstrap with installer validation |
 
-Safety and review rules are documented in [Engineering Safety Model](./docs/engineering-safety-model.md).
+Safety and review rules are documented in [Engineering Safety Model](./docs/engineering-safety-model.md). Use the [Script Release Checklist](./docs/script-release-checklist.md) before promoting a script as a reusable toolkit.
 
 ---
 
@@ -170,7 +170,8 @@ script-toolbox/
 │  └─ setup-windows-openssh-keyonly.ps1
 ├─ docs/
 │  ├─ ci-quality-gates.md
-│  └─ engineering-safety-model.md
+│  ├─ engineering-safety-model.md
+│  └─ script-release-checklist.md
 ├─ setup-and-config-git-windows/
 │  ├─ README-setup-windows-git-basic.md
 │  ├─ README-setup-windows-git-basic-ru.md
