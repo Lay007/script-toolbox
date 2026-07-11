@@ -1,0 +1,97 @@
+name: Script problem
+description: Report a reproducible failure, unsafe behavior, or documentation mismatch in a PowerShell toolkit.
+title: "[Script] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Provide the smallest safe reproduction. Remove passwords, access tokens, private keys, hostnames, IP addresses, user names, and internal paths unless they are essential and already public.
+
+  - type: input
+    id: toolkit
+    attributes:
+      label: Toolkit and script
+      placeholder: "setup-cmake-windows/setup-windows-cmake.ps1"
+    validations:
+      required: true
+
+  - type: input
+    id: revision
+    attributes:
+      label: Repository revision
+      description: Commit SHA, branch, tag, or clone date.
+      placeholder: "main at abc1234"
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include Windows edition/build, PowerShell version, architecture, elevation state, execution policy, and relevant tool versions.
+      placeholder: |
+        Windows: Windows 11 24H2 build ...
+        PowerShell: 7.5.x
+        Architecture: x64
+        Elevated: yes/no
+        Execution policy: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Exact command and parameters
+      description: Replace sensitive values with clear placeholders while preserving the command structure.
+      render: powershell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result and first relevant error
+      description: Include the first useful error and the final validation state.
+      render: text
+    validations:
+      required: true
+
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Impact
+      options:
+        - Documentation only
+        - Script exits without making changes
+        - Partial configuration was applied
+        - Host access or networking may be affected
+        - Security-sensitive behavior
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: recovery
+    attributes:
+      label: Recovery or rollback attempted
+      description: State whether an RDP/console session remained available and what was done to restore the system.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety checks
+      options:
+        - label: I read the toolkit README and `docs/engineering-safety-model.md`.
+          required: true
+        - label: I removed secrets and private infrastructure details from this report.
+          required: true
+        - label: I kept an alternate access path for SSH, firewall, or remote-access changes when applicable.
+          required: false
