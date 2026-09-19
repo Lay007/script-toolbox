@@ -2,6 +2,12 @@
 
 This directory is reserved for Pester tests.
 
+`pwsh -NoProfile -File tools/test-ssh-config.ps1` already tests the SSH config
+transformations without Pester: it extracts only three pure functions from the
+AST, checks global/Match scope and idempotence, and never invokes the installer,
+changes accounts/ACLs/services, or writes system configuration. This is not an
+end-to-end dry-run of the setup script; a disposable VM is still required for that.
+
 Recommended structure:
 
 ```text
