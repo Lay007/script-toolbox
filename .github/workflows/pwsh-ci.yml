@@ -21,6 +21,10 @@ jobs:
     timeout-minutes: 15
 
     steps:
+      - name: Test Markdown link checker
+        shell: pwsh
+        run: pwsh -NoProfile -File tests/test-markdown-links.ps1
+
       - name: Checkout
         uses: actions/checkout@v7
 
