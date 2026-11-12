@@ -21,12 +21,12 @@ jobs:
     timeout-minutes: 15
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
       - name: Test Markdown link checker
         shell: pwsh
         run: pwsh -NoProfile -File tests/test-markdown-links.ps1
-
-      - name: Checkout
-        uses: actions/checkout@v7
 
       - name: Check PowerShell script syntax
         shell: pwsh
