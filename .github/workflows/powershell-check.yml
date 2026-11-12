@@ -54,7 +54,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $excluded = @('.git', '.github', 'docs')
+          $excluded = @('.git', '.github', 'docs', 'tests')
           $toolDirs = Get-ChildItem -Path . -Directory | Where-Object {
             ($excluded -notcontains $_.Name) -and
             (Get-ChildItem -Path $_.FullName -Filter '*.ps1' -File -ErrorAction SilentlyContinue)
